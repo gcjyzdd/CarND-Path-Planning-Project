@@ -69,18 +69,25 @@ struct Traj2D
         vs = v_s;
         s0 = s_0;
         d0 = d_0;
+        // sign of velocity of s
         double signs = vs > v0 ? 1 : -1;
 
+        // acc of s
         as = MAX_ACC * 0.8 * signs;
-        ad = 4.;
+        // end time of acc
         ts = abs((vs - v0) / as);
+        // s at ts
         sts = s0 + v0 * ts + 0.5 * as * ts * ts;
-
+        // s at T
         sT = s0 + vs * HORIZON - 0.5 * as * ts * ts;
+        // d at T
         dT = 4. * lane + 2;
+        // sign of velocity of d
         double signd = dT > d0 ? 1 : -1;
 
+        // velocity of d
         vd = 2.0 * signd;
+        // end time of vd
         td = abs((dT - d0) / vd);
 
         vector<double> t_vec;
