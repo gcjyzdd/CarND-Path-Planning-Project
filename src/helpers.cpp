@@ -11,117 +11,6 @@ static const int N_SAMPLES = 1;
 static std::random_device rd{};
 static std::mt19937 gen{rd()};
 
-vector<double> Vehicle::choose_next_state(const vector<Vehicle> &predictions)
-{
-    follow_front = false;
-    vector<string> possible_successor_states = successor_states();
-    // cout << "Hello 2 .. tr\n";
-    vector<double> costs;
-    vector<vector<double>> trajectories;
-    for (size_t i = 0; i < possible_successor_states.size(); ++i)
-    {
-        vector<double> traj_states =
-            generate_trajectory(possible_successor_states[i], predictions);
-        // cout << "Hello 2 .. traj_states.size() = " << traj_states.size();
-        costs.push_back(traj_states[13]);
-        trajectories.push_back(traj_states);
-        cout << possible_successor_states[i] << ": " << traj_states[13] << ", ";
-    }
-    cout << endl;
-    int idx = distance(costs.begin(), min_element(costs.begin(), costs.end()));
-
-    lstate = possible_successor_states[idx];
-    // state = evalState(trajectories[idx], 0.02*50/*trajectories[idx][12]*/);
-    lane += lane_direction[lstate];
-
-    if (lstate.compare("KL") == 0 && follow_front)
-    {
-        this->target_speed = this->speed;
-    }
-    else
-    {
-        this->target_speed = MAX_SPEED * 0.95;
-    }
-    return trajectories[idx];
-}
-
-vector<double>
-Vehicle::choose_next_state_v2(const vector<Vehicle> &predictions)
-{
-    int idx = 0;
-    vector<int> lanes(3);
-    for (int i = 0; i < 3; ++i)
-        lanes[i] = i - lane;
-
-    if (get_vehicle_ahead(predictions, idx))
-    {
-        vector<double> s_start(state.begin(), state.begin() + 3);
-        vector<double> d_start(state.begin() + 3, state.begin() + 6);
-
-        size_t ns = 5, nd = 3, nv = 4;
-        double delta_s = predictions[idx].state[0] - state[0] +
-                         predictions[idx].state[1] * HORIZON;
-        vector<double> ds;
-        ds.push_back(10 + s_start[0]);
-        for (size_t i = 0; i < ns; ++i)
-        {
-            ds.push_back(s_start[0] + (float)i / (ns - 1) * delta_s);
-        }
-        double v_target = predictions[idx].state[1];
-        double minv = min2(state[1], v_target);
-        double dv = MAX_SPEED - minv;
-
-        vector<vector<double>> trajectories(ds.size() * nd * nv);
-        vector<double> trajectory(13), s_goal(3), d_goal(3), s_coeffs(6),
-            d_coeffs(6), delta;
-        trajectory[12] = HORIZON;
-        double cost, best_cost = 1e9;
-        int index = 0, best_index;
-        for (size_t i = 0; i < nv; ++i)
-        {
-            for (size_t j = 0; j < nd; ++j)
-            {
-                for (size_t k = 0; k < ds.size(); ++k)
-                {
-                    s_goal = {ds[k], -v_target + minv + (float)i / (nv - 1) * dv, 0};
-                    d_goal = {j * 4.0 + 2, 0, 0};
-                    s_coeffs = JMT(s_start, s_goal, HORIZON);
-                    d_coeffs = JMT(d_start, d_goal, HORIZON);
-                    copy(s_coeffs.begin(), s_coeffs.end(), trajectory.begin());
-                    copy(d_coeffs.begin(), d_coeffs.end(), trajectory.begin() + 6);
-                    trajectories[index] = (trajectory);
-                    cost = calculate_cost_traj(trajectory, idx, delta, HORIZON,
-                                               predictions, lane);
-                    if (cost < best_cost)
-                    {
-                        best_cost = cost;
-                        best_index = index;
-                    }
-                    ++index;
-                    cout << cost << ", ";
-                }
-                cout << endl;
-            }
-            cout << endl;
-        }
-        cout << "Best cost = " << best_cost << ", best_index = " << best_index
-             << endl;
-        printVec(trajectories[best_index]);
-        calculate_cost_traj(trajectories[best_index], idx, delta, HORIZON,
-                            predictions, lane, true);
-        trajectory = trajectories[best_index];
-        vector<double> best_s_coeffs(trajectory.begin(), trajectory.begin() + 6);
-        auto v_coeffs = differntiate(best_s_coeffs);
-        target_speed = polyval(v_coeffs, 0.02 * 50);
-        target_speed = target_speed > 2 ? target_speed : 2;
-        trajectory.push_back(best_cost);
-        return trajectory;
-    }
-    else
-    {
-        cerr << "No vehicle in front!. Shift the host vehicle forward.\n";
-    }
-}
 
 Traj2D
 Vehicle::choose_next_state_v3(const vector<Vehicle> &predictions)
@@ -135,6 +24,8 @@ Vehicle::choose_next_state_v3(const vector<Vehicle> &predictions)
     double v0 = state[1];
 
     int idx = 0, r_idx = 0;
+    // check if there is a vehicle ahead of the host vehicle,
+    // if yes, get the index of the target vehicle
     bool ahead = get_vehicle_ahead(predictions, idx);
 
     vector<double> vt(nv + 1);
@@ -233,141 +124,10 @@ Vehicle::choose_next_state_v3(const vector<Vehicle> &predictions)
     return trajectories[best_index];
 }
 
-vector<string> Vehicle::successor_states()
-{
-    /*
-Provides the possible next states given the current state for the FSM
-discussed in the course, with the exception that lane changes happen
-instantaneously, so LCL and LCR can only transition back to KL.
+/**
+ * check if there is a vehicle ahead of the host vehicle,
+ * if yes, get the index of the target vehicle
 */
-    vector<string> states;
-    states.push_back("KL");
-    string state = this->lstate;
-    if (state.compare("KL") == 0)
-    {
-        states.push_back("LCL");
-        states.push_back("LCR");
-    }
-    else if (state.compare("LCL") == 0)
-    {
-        if (lane != 0)
-        {
-            states.push_back("LCL");
-        }
-    }
-    else if (state.compare("LCR") == 0)
-    {
-        if (lane != lanes_available - 1)
-        {
-            states.push_back("LCR");
-        }
-    }
-
-    return states;
-}
-
-vector<double>
-Vehicle::generate_trajectory(string state_,
-                             const vector<Vehicle> &predictions)
-{
-    // cout << "state " << state_ << "\n";
-    if (state_.compare("KL") == 0)
-    {
-        return keep_lane_trajectory(predictions);
-    }
-    else
-    {
-        return lane_change_trajectory(state_, predictions);
-    }
-}
-
-vector<double>
-Vehicle::keep_lane_trajectory(const vector<Vehicle> &predictions)
-{
-    // cout << "___lane keep traj____\n";
-    int idx = 0;
-    if (get_vehicle_ahead(predictions, idx))
-    {
-        cout << "There is a vehicle in front, speed " << predictions[idx].state[1]
-             << "m/s, ";
-        double max_s = 60, min_s = 10;
-        if (predictions[idx].state[0] - state[0] > max_s)
-        {
-            return free_lane_trajectory();
-        }
-        vector<double> start_s(state.begin(), state.begin() + 3);
-        vector<double> start_d(state.begin() + 3, state.begin() + 6);
-        vector<double> delta = {-min_s, 0, 0, 0, 0, 0};
-        // follow front vehicle
-        follow_front = true;
-        this->speed = (MAX_SPEED * 0.9 - predictions[idx].state[1]) /
-                          (max_s - min_s) * (predictions[idx].state[0] - state[0]) +
-                      predictions[idx].state[1];
-        cout << predictions[idx].state[0] - state[0] << "m. \n";
-        return PTG(start_s, start_d, idx, delta, HORIZON, predictions);
-    }
-    else
-    {
-        return free_lane_trajectory();
-
-        vector<double> start_s(state.begin(), state.begin() + 3);
-        vector<double> start_d(state.begin() + 3, state.begin() + 6);
-
-        double max_avail_speed = (state[1] + MAX_ACC * HORIZON);
-        max_avail_speed = max_avail_speed > MAX_SPEED ? MAX_SPEED : max_avail_speed;
-        double target_speed = max_avail_speed - state[1];
-        vector<double> delta = {50, 0, 0, 0, 0, 0};
-
-        vector<Vehicle> tmp;
-        tmp.push_back(*this);
-        return PTG(start_s, start_d, 0, delta, HORIZON, tmp);
-    }
-}
-
-vector<double>
-Vehicle::lane_change_trajectory(string states,
-                                const vector<Vehicle> &predictions)
-{
-    // cout << "___lane change traj____\n";
-    int idx = 0;
-    int new_lane = lane + lane_direction[states];
-    if (get_vehicle_ahead(predictions, idx))
-    {
-        vector<double> start_s(state.begin(), state.begin() + 3);
-        vector<double> start_d(state.begin() + 3, state.begin() + 6);
-        vector<double> delta = {0, 0, 0, 4.0 * lane_direction[states], 0, 0};
-        // MAX_SPEED * 0.98 - predictions[idx].state[1]
-        return PTG(start_s, start_d, idx, delta, HORIZON, predictions);
-    }
-    else
-    {
-        vector<double> rst(14, 0);
-        rst[13] = 1e9;
-        return rst;
-    }
-}
-
-vector<double> Vehicle::free_lane_trajectory()
-{
-    cout << "free lane ...\n";
-    double max_avail_speed = (state[1] + MAX_ACC * HORIZON);
-    double target_speed = MAX_SPEED * 0.95;
-
-    max_avail_speed =
-        max_avail_speed > target_speed ? target_speed : max_avail_speed;
-    double delta_speed = max_avail_speed - state[1];
-    double a = MAX_ACC * 0.8; // delta_speed / HORIZON;
-    double ta = (target_speed - state[1]) / a;
-    double s0 = state[0] + target_speed * HORIZON - 0.5 * a * ta * ta;
-
-    vector<double> target_state = {s0, target_speed, 0, 2. + 4. * lane, 0, 0};
-
-    printState(state);
-    printState(target_state);
-
-    return PTG_free(state, target_state, HORIZON);
-}
-
 bool Vehicle::get_vehicle_ahead(const vector<Vehicle> &predictions, int &idx)
 {
     bool found = false;
@@ -391,6 +151,13 @@ bool Vehicle::get_vehicle_ahead(const vector<Vehicle> &predictions, int &idx)
     return found;
 }
 
+/**
+ * Check if it's available to change lane.
+ * 
+ * Briefly speaking, the host vehicle should change lane either if there is no vehicles at 
+ * its side, or the side vehicle is behind the host vehicle and the host vehicle is driving
+ * faster than the side vehicle
+*/
 bool Vehicle::check_lane_change(const vector<Vehicle> &predictions, const int lane_in, int &idx)
 {
     // enable lane change
@@ -433,6 +200,12 @@ bool Vehicle::check_lane_change(const vector<Vehicle> &predictions, const int la
     return lc;
 }
 
+/**
+ * Path trajectory generation
+ * 
+ * Given initial state [s0,v0,a0], destination state [sT,vT,aT], and 
+ * time duration T, generate an optimal trajectory.
+*/
 vector<double> PTG(const vector<double> &start_s, const vector<double> &start_d,
                    const int &target_vehicle, const vector<double> &delta,
                    const double &T, const vector<Vehicle> &predictions)

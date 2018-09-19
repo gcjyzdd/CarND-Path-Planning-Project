@@ -71,6 +71,11 @@ double buffer_cost(const vector<double> &traj,
                    const vector<double> &delta, const double T,
                    const vector<Vehicle> &predictions);
 
+/**
+ * Cost of buffer distance
+ * 
+ * Return a linear cost wrt longitudinal distance
+*/
 double buffer_cost(const Traj2D &traj,
                    const double T,
                    const vector<Vehicle> &predictions);

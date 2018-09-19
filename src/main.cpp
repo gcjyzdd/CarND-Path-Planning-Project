@@ -270,6 +270,7 @@ int main()
 					size_t idx_path_start = 0;
 					if (prev_size > 10)
 					{
+						// reduce number of previous points
 						prev_size = 5;
 
 						previous_path_x.resize(prev_size);
@@ -280,22 +281,11 @@ int main()
 							previous_path_y[i] = prev_path_y[i];
 						}
 						auto tmp = getFrenet(previous_path_x[prev_size - 1], previous_path_y[prev_size - 1], car_yaw * d2r, map_waypoints_x, map_waypoints_y);
-						//cout << "end path s = " << end_path_s << " tmp[0] = " << tmp[0] << endl;
 						end_path_s = tmp[0];
 						end_path_d = tmp[1];
 						car_s = end_path_s;
 						car_d = end_path_d;
 					}
-
-					vector<double> prev_d, prev_s;
-					for (size_t i = 0; i < previous_path_x.size(); ++i)
-					{
-						auto tmp = getFrenet(previous_path_x[i], previous_path_y[i], car_yaw * d2r, map_waypoints_x, map_waypoints_y);
-						prev_s.push_back(tmp[0]);
-						prev_d.push_back(tmp[1]);
-					}
-					cout << "previous s = ";
-					printVec(prev_s);
 
 					car_speed *= tomps;
 					cout << "car: speed = " << car_speed << "m/s, (x,y) = (" << car_x << ", " << car_y << "), (s, d) = (" << car_s << ", " << car_d << ")\n";
@@ -327,21 +317,13 @@ int main()
 						double vx = sensor_fusion[i][3];
 						double vy = sensor_fusion[i][4];
 						double v_speed = sqrt(vx * vx + vy * vy);
-						//v_speed = abs(v_speed);
-						//v_speed *= tomps;
-						vector<double> veh = {sensor_fusion[i][5], v_speed /*+ car_speed*/, 0, sensor_fusion[i][6], 0, 0};
+						vector<double> veh = {sensor_fusion[i][5], v_speed, 0, sensor_fusion[i][6], 0, 0};
 						predictions.push_back(Vehicle(veh));
 						predictions[i].updateTraj();
 					}
-
-					//vector<double> ego_rst = ego.choose_next_state_v2(predictions);
 					auto ego_rst = ego.choose_next_state_v3(predictions);
 					ego.prev_traj = ego_rst;
 					cout << "target speed = " << ego.target_speed << ", ref_vel = " << ref_vel << endl;
-					//vector<double> ego_rst = ego.free_lane_trajectory();
-					//ego.state = evalState(ego_rst, dt * (N - prev_size));
-
-					//cout << "cost = " << ego_rst[13] << ", lane = " << ego.lane << ", state = " << ego.lstate << "\n";
 
 					printState(ego.state);
 
@@ -350,17 +332,16 @@ int main()
 					{
 						t_vec.push_back(dt * (1 + i));
 					}
-					vector<double> t_fit = {2, 3, 4, 5};
+					vector<double> t_fit = {1, 2, 3, 4, 5};
 					vector<double> traj_s, traj_d, fit_s, fit_d;
 					ego_rst.pos(t_vec, traj_s, traj_d);
 					ego_rst.pos(t_fit, fit_s, fit_d);
 
 					cout << "fit_s = ";
 					printVec(fit_s);
-					//cout << "traj_s = ";
-					//printVec(traj_s);
 					vector<double> traj_x, traj_y, fit_x, fit_y;
 
+					// Frenet CS to world CS
 					for (size_t i = 0; i < traj_s.size(); ++i)
 					{
 						auto tmp = getXY(traj_s[i], traj_d[i], map_waypoints_s, map_waypoints_x, map_waypoints_y);
@@ -374,8 +355,8 @@ int main()
 						fit_y.push_back(tmp[1]);
 					}
 
-					// a list of waypoints, evenly spaced at 30m
-					// then interpolate with a spline and fill more points
+					// a list of waypoints
+					// interpolate with a spline and fill more points
 					vector<double> ptsx, ptsy;
 					// vehicle frame
 					double ref_x = car_x;
@@ -405,14 +386,6 @@ int main()
 						ptsy.push_back(ref_y_prev);
 						ptsy.push_back(ref_y);
 					}
-					/*for (size_t i = 0; i < fit_x.size(); ++i)
-					{
-						if (fit_x[i] > ptsx[1])
-						{
-							ptsx.push_back(fit_x[i]);
-							ptsy.push_back(fit_y[i]);
-						}
-					}*/
 					ptsx.insert(ptsx.end(), fit_x.begin(), fit_x.end());
 					ptsy.insert(ptsy.end(), fit_y.begin(), fit_y.end());
 
