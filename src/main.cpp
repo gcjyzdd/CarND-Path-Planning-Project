@@ -431,27 +431,19 @@ int main()
 
 					vector<double> next_x, next_y;
 
+					// control speed
 					if (abs(ref_vel - ego.target_speed) > 0.224)
 					{
 						if (ref_vel < ego.target_speed)
 							ref_vel += 0.224 * 2.5;
 						else
-							ref_vel -= 0.224;
+							ref_vel -= 0.224 * 1.5;
 					}
 					else if (abs(ref_vel - ego.target_speed) > 0.01)
 					{
 						ref_vel = ego.target_speed;
 					}
-					/*
-					if (ref_vel > ego.target_speed + 0.225)
-					{
-						ref_vel -= 0.112 * 2;
-					}
-					else if (ref_vel < ego.target_speed)
-					{
-						ref_vel += 0.112 * 2;
-					}*/
-					//ref_vel = ego.target_speed;
+					// control speed end
 					for (size_t i = 0; i < traj_x.size(); ++i)
 					{
 						traj_x[i] = (i + 1) * 0.02 * ref_vel * slope;
