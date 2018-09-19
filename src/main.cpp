@@ -292,6 +292,7 @@ int main()
 
 					// use ref_vel instead of car_speed
 					car_speed = ref_vel;
+					// update state of the host vehicle 
 					ego.state = {car_s, car_speed, 0, car_d, 0, 0};
 					double dt = 0.02;
 					int N = 50;
@@ -308,6 +309,7 @@ int main()
 
 					ego.updateLane();
 
+					// push all target vehicles
 					vector<Vehicle> predictions;
 					for (size_t i = 0; i < sensor_fusion.size(); ++i)
 					{ // car's unique ID, car's x position in map coordinates,
@@ -321,6 +323,7 @@ int main()
 						predictions.push_back(Vehicle(veh));
 						predictions[i].updateTraj();
 					}
+					// Calculate the best drivable trajectory
 					auto ego_rst = ego.choose_next_state_v3(predictions);
 					ego.prev_traj = ego_rst;
 					cout << "target speed = " << ego.target_speed << ", ref_vel = " << ref_vel << endl;
@@ -332,8 +335,10 @@ int main()
 					{
 						t_vec.push_back(dt * (1 + i));
 					}
+					// time points for fiiting the trajectory
 					vector<double> t_fit = {1, 2, 3, 4, 5};
 					vector<double> traj_s, traj_d, fit_s, fit_d;
+					// get Frenet coordinates at each time step
 					ego_rst.pos(t_vec, traj_s, traj_d);
 					ego_rst.pos(t_fit, fit_s, fit_d);
 

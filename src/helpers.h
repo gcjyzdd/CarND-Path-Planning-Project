@@ -112,45 +112,7 @@ struct Traj2D
         }
 
         cached = true;
-    }
-
-    double get_td0()
-    {
-        double t = 0.;
-
-        return t;
-    }
-
-    double get_d(double t)
-    {
-        double dt = 0.;
-        double dD = dT - d0;
-        if (abs(dD) <= 4.0)
-        {
-            if (abs(dD) <= 2.0)
-            {
-                double vd0 = sqrt(2. * 4 * abs(dD)) * dD / abs(dD);
-                double ad0 = -4. * dD / abs(dD);
-                dt = vd0 * t + 0.5 * ad0 * t * t;
-            }
-            else
-            {
-                double vd0 = sqrt(2. * 4 * (4 - abs(dD))) * dD / abs(dD);
-                double ad0 = 4. * dD / abs(dD);
-                dt = vd0 * t + 0.5 * ad0 * t * t;
-            }
-        }
-        else
-        {
-            if (abs(dD) <= 6.0)
-            {
-            }
-            else
-            {
-            }
-        }
-        return dt;
-    }
+    }    
 
     vector<double> pos(const double t)
     {
